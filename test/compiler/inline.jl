@@ -810,6 +810,76 @@ let
     @test invoke(Any[10]) === false
 end
 
+# test union-split, non-dispatchtuple callsite inlining
+
+@constprop :none @noinline abstract_unionsplit(@nospecialize x::Any) = Base.inferencebarrier(:Any)
+@constprop :none @noinline abstract_unionsplit(@nospecialize x::Number) = Base.inferencebarrier(:Number)
+let src = code_typed1((Any,)) do x
+        abstract_unionsplit(x)
+    end
+    @test count(isinvoke(:abstract_unionsplit), src.code) == 2
+    @test count(iscall((src, abstract_unionsplit)), src.code) == 0 # no fallback dispatch
+end
+let src = code_typed1((Union{Type,Number},)) do x
+        abstract_unionsplit(x)
+    end
+    @test count(isinvoke(:abstract_unionsplit), src.code) == 2
+    @test count(iscall((src, abstract_unionsplit)), src.code) == 0 # no fallback dispatch
+end
+
+@constprop :none @noinline abstract_unionsplit_fallback(@nospecialize x::Type) = Base.inferencebarrier(:Any)
+@constprop :none @noinline abstract_unionsplit_fallback(@nospecialize x::Number) = Base.inferencebarrier(:Number)
+let src = code_typed1((Any,)) do x
+        abstract_unionsplit_fallback(x)
+    end
+    @test count(isinvoke(:abstract_unionsplit_fallback), src.code) == 2
+    @test count(iscall((src, abstract_unionsplit_fallback)), src.code) == 1 # fallback dispatch
+end
+let src = code_typed1((Union{Type,Number},)) do x
+        abstract_unionsplit_fallback(x)
+    end
+    @test count(isinvoke(:abstract_unionsplit_fallback), src.code) == 2
+    @test count(iscall((src, abstract_unionsplit)), src.code) == 0 # no fallback dispatch
+end
+
+@constprop :aggressive @inline abstract_unionsplit(c, @nospecialize x::Any) = (c && println("erase me"); typeof(x))
+@constprop :aggressive @inline abstract_unionsplit(c, @nospecialize x::Number) = (c && println("erase me"); typeof(x))
+let src = code_typed1((Any,)) do x
+        abstract_unionsplit(false, x)
+    end
+    @test count(iscall((src, typeof)), src.code) == 2
+    @test count(isinvoke(:println), src.code) == 0
+    @test count(iscall((src, println)), src.code) == 0
+    @test count(iscall((src, abstract_unionsplit)), src.code) == 0 # no fallback dispatch
+end
+let src = code_typed1((Union{Type,Number},)) do x
+        abstract_unionsplit(false, x)
+    end
+    @test count(iscall((src, typeof)), src.code) == 2
+    @test count(isinvoke(:println), src.code) == 0
+    @test count(iscall((src, println)), src.code) == 0
+    @test count(iscall((src, abstract_unionsplit)), src.code) == 0 # no fallback dispatch
+end
+
+@constprop :aggressive @inline abstract_unionsplit_fallback(c, @nospecialize x::Type) = (c && println("erase me"); typeof(x))
+@constprop :aggressive @inline abstract_unionsplit_fallback(c, @nospecialize x::Number) = (c && println("erase me"); typeof(x))
+let src = code_typed1((Any,)) do x
+        abstract_unionsplit_fallback(false, x)
+    end
+    @test count(iscall((src, typeof)), src.code) == 2
+    @test count(isinvoke(:println), src.code) == 0
+    @test count(iscall((src, println)), src.code) == 0
+    @test count(iscall((src, abstract_unionsplit_fallback)), src.code) == 1 # fallback dispatch
+end
+let src = code_typed1((Union{Type,Number},)) do x
+        abstract_unionsplit_fallback(false, x)
+    end
+    @test count(iscall((src, typeof)), src.code) == 2
+    @test count(isinvoke(:println), src.code) == 0
+    @test count(iscall((src, println)), src.code) == 0
+    @test count(iscall((src, abstract_unionsplit)), src.code) == 0 # no fallback dispatch
+end
+
 # issue 43104
 
 @inline isGoodType(@nospecialize x::Type) =
@@ -1097,11 +1167,11 @@ end
 
 global x44200::Int = 0
 function f44200()
-    global x = 0
-    while x < 10
-        x += 1
+    global x44200 = 0
+    while x44200 < 10
+        x44200 += 1
     end
-    x
+    x44200
 end
 let src = code_typed1(f44200)
     @test count(x -> isa(x, Core.PiNode), src.code) == 0
