@@ -139,7 +139,7 @@ mutable struct InferenceState
             Vector{InferenceState}(), # callers_in_cycle
             #=parent=#nothing,
             cache === :global, false, false,
-            Effects(consistent, ALWAYS_TRUE, ALWAYS_TRUE, ALWAYS_TRUE,
+            Effects(consistent, ALWAYS_TRUE, ALWAYS_TRUE, ALWAYS_TRUE, ALWAYS_TRUE,
                    inbounds_taints_consistency),
             CachedMethodTable(method_table(interp)),
             interp)

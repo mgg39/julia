@@ -418,9 +418,9 @@ eval(Core, :(LineInfoNode(mod::Module, @nospecialize(method), file::Symbol, line
              $(Expr(:new, :LineInfoNode, :mod, :method, :file, :line, :inlined_at))))
 eval(Core, :(CodeInstance(mi::MethodInstance, @nospecialize(rettype), @nospecialize(inferred_const),
                           @nospecialize(inferred), const_flags::Int32,
-                          min_world::UInt, max_world::UInt, ipo_effects::UInt8, effects::UInt8,
+                          min_world::UInt, max_world::UInt, ipo_effects::UInt32, effects::UInt32,
 			  relocatability::UInt8) =
-                ccall(:jl_new_codeinst, Ref{CodeInstance}, (Any, Any, Any, Any, Int32, UInt, UInt, UInt8, UInt8, UInt8),
+                ccall(:jl_new_codeinst, Ref{CodeInstance}, (Any, Any, Any, Any, Int32, UInt, UInt, UInt32, UInt32, UInt8),
                     mi, rettype, inferred_const, inferred, const_flags, min_world, max_world, ipo_effects, effects, relocatability)))
 eval(Core, :(Const(@nospecialize(v)) = $(Expr(:new, :Const, :v))))
 eval(Core, :(PartialStruct(@nospecialize(typ), fields::Array{Any, 1}) = $(Expr(:new, :PartialStruct, :typ, :fields))))

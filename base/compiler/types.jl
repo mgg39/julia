@@ -37,18 +37,19 @@ struct Effects
     consistent::TriState
     effect_free::TriState
     nothrow::TriState
+    nothrow_if_inbounds::TriState
     terminates::TriState
     # This effect is currently only tracked in inference and modified
     # :consistent before caching. We may want to track it in the future.
     inbounds_taints_consistency::Bool
 end
-Effects(consistent::TriState, effect_free::TriState, nothrow::TriState, terminates::TriState) =
-    Effects(consistent, effect_free, nothrow, terminates, false)
-Effects() = Effects(TRISTATE_UNKNOWN, TRISTATE_UNKNOWN, TRISTATE_UNKNOWN, TRISTATE_UNKNOWN)
+Effects(consistent::TriState, effect_free::TriState, nothrow::TriState nothrow_if_inbounds::TriState, terminates::TriState) =
+    Effects(consistent, effect_free, nothrow, nothrow_if_inbounds, terminates, false)
+Effects() = Effects(TRISTATE_UNKNOWN, TRISTATE_UNKNOWN, TRISTATE_UNKNOWN, TRISTATE_UNKNOWN, TRISTATE_UNKNOWN)
 
 Effects(e::Effects; consistent::TriState=e.consistent,
-    effect_free::TriState = e.effect_free, nothrow::TriState=e.nothrow, terminates::TriState=e.terminates,
-    inbounds_taints_consistency::Bool = e.inbounds_taints_consistency) =
+    effect_free::TriState = e.effect_free, nothrow::TriState=e.nothrow, nothrow_if_inbounds::TriState=e.nothrow_if_inbounds,
+    terminates::TriState=e.terminates, inbounds_taints_consistency::Bool = e.inbounds_taints_consistency) =
         Effects(consistent, effect_free, nothrow, terminates, inbounds_taints_consistency)
 
 is_total_or_error(effects::Effects) =
@@ -58,19 +59,25 @@ is_total_or_error(effects::Effects) =
 is_total(effects::Effects) =
     is_total_or_error(effects) && effects.nothrow === ALWAYS_TRUE
 
-is_removable_if_unused(effects::Effects) =
+is_removable_if_unused(effects::Effects, assume_inbounds::Bool) =
     effects.effect_free === ALWAYS_TRUE &&
     effects.terminates === ALWAYS_TRUE &&
-    effects.nothrow === ALWAYS_TRUE
+    (effects.nothrow === ALWAYS_TRUE ||
+    (assume_inbounds && effects.nothrow_if_inbounds === ALWAYS_TRUE))
 
-const EFFECTS_TOTAL = Effects(ALWAYS_TRUE, ALWAYS_TRUE, ALWAYS_TRUE, ALWAYS_TRUE)
+const EFFECTS_TOTAL = Effects(ALWAYS_TRUE, ALWAYS_TRUE, ALWAYS_TRUE, ALWAYS_TRUE, ALWAYS_TRUE)
 
-encode_effects(e::Effects) = e.consistent.state | (e.effect_free.state << 2) | (e.nothrow.state << 4) | (e.terminates.state << 6)
-decode_effects(e::UInt8) =
+encode_effects(e::Effects) = e.consistent.state |
+    (e.effect_free.state << 2) |
+    (e.nothrow.state << 4) |
+    (e.nothrow_if_inbounds.state << 6) |
+    (UInt32(e.terminates.state) << 8)
+decode_effects(e::UInt32) =
     Effects(TriState(e & 0x3),
         TriState((e >> 2) & 0x3),
         TriState((e >> 4) & 0x3),
-        TriState((e >> 6) & 0x3), false)
+        TriState((e >> 6) & 0x3),
+        TriState((e >> 8) & 0x3), false)
 
 function tristate_merge(old::Effects, new::Effects)
     Effects(tristate_merge(
@@ -79,6 +86,8 @@ function tristate_merge(old::Effects, new::Effects)
             old.effect_free, new.effect_free),
         tristate_merge(
             old.nothrow, new.nothrow),
+        tristate_merge(
+            old.nothrow_if_inbounds, new.nothrow_if_inbounds),
         tristate_merge(
             old.terminates, new.terminates),
         old.inbounds_taints_consistency ||
@@ -89,6 +98,7 @@ struct EffectsOverride
     consistent::Bool
     effect_free::Bool
     nothrow::Bool
+    nothrow_if_inbounds::Bool
     terminates::Bool
     terminates_locally::Bool
 end
@@ -98,8 +108,9 @@ function encode_effects_override(eo::EffectsOverride)
     eo.consistent && (e |= 0x01)
     eo.effect_free && (e |= 0x02)
     eo.nothrow && (e |= 0x04)
-    eo.terminates && (e |= 0x08)
-    eo.terminates_locally && (e |= 0x10)
+    eo.nothrow_if_inbounds && (e |= 0x08)
+    eo.terminates && (e |= 0x10)
+    eo.terminates_locally && (e |= 0x20)
     e
 end
 
@@ -109,7 +120,8 @@ decode_effects_override(e::UInt8) =
         (e & 0x02) != 0x00,
         (e & 0x04) != 0x00,
         (e & 0x08) != 0x00,
-        (e & 0x10) != 0x00)
+        (e & 0x10) != 0x00,
+        (e & 0x20) != 0x00)
 
 """
     InferenceResult

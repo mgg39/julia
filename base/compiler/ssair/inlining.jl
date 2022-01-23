@@ -516,7 +516,7 @@ function ir_inline_unionsplit!(compact::IncrementalCompact, idx::Int,
         if isa(case, InliningTodo)
             val = ir_inline_item!(compact, idx, argexprs′, linetable, case, boundscheck, todo_bbs)
         elseif isa(case, InvokeCase)
-            effect_free = is_removable_if_unused(case.effects)
+            effect_free = is_removable_if_unused(case.effects, boundscheck === :off)
             val = insert_node_here!(compact,
                 NewInstruction(Expr(:invoke, case.invoke, argexprs′...), typ, nothing,
                     line, effect_free ? IR_FLAG_EFFECT_FREE : IR_FLAG_NULL, effect_free))
@@ -873,7 +873,7 @@ function handle_single_case!(
         isinvoke && rewrite_invoke_exprargs!(stmt)
         stmt.head = :invoke
         pushfirst!(stmt.args, case.invoke)
-        if is_removable_if_unused(case.effects)
+        if is_removable_if_unused(case.effects, ir[SSAValue(idx)][:flag] & IR_FLAG_INBOUNDS != 0)
             ir[SSAValue(idx)][:flag] |= IR_FLAG_EFFECT_FREE
         end
     elseif case === nothing

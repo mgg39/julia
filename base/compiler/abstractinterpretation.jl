@@ -28,6 +28,21 @@ function should_infer_for_effects(sv::InferenceState)
     sv.ipo_effects.effect_free === ALWAYS_TRUE
 end
 
+function merge_statement_effect!(sv::InferenceState, effects::Effects)
+    stmt_inbounds = get_curr_ssaflag(sv) & IR_FLAG_INBOUNDS != 0
+    propagate_inbounds = sv.src.propagate_inbounds
+    # Look at inbounds state and see what we need to do about :nothrow_if_inbounds
+    adjusted_effects = Effects(
+        effects.consistent,
+        effects.effect_free,
+        stmt_inbounds ? effects.nothrow_if_inbounds : effects.nothrow,
+        propagate_inbounds ? effects.nothrow_if_inbounds :
+            (effects.nothrow === ALWAYS_TRUE ? ALWAYS_TRUE : TRISTATE_UNKNOWN),
+        effects.terminates
+    )
+    tristate_merge!(sv, adjusted_effects)
+end
+
 function abstract_call_gf_by_type(interp::AbstractInterpreter, @nospecialize(f),
                                   arginfo::ArgInfo, @nospecialize(atype),
                                   sv::InferenceState, max_methods::Int = get_max_methods(sv.mod, interp))
@@ -104,7 +119,7 @@ function abstract_call_gf_by_type(interp::AbstractInterpreter, @nospecialize(f),
                 if const_result !== nothing
                     (;rt, effects, const_result) = const_result
                 end
-                tristate_merge!(sv, effects)
+                merge_statement_effect!(sv, effects)
                 push!(const_results, const_result)
                 if const_result !== nothing
                     any_const_result = true
@@ -144,7 +159,7 @@ function abstract_call_gf_by_type(interp::AbstractInterpreter, @nospecialize(f),
                 this_rt = const_result.rt
                 (; effects, const_result) = const_result
             end
-            tristate_merge!(sv, effects)
+            merge_statement_effect!(sv, effects)
             push!(const_results, const_result)
             if const_result !== nothing
                 any_const_result = true
@@ -181,7 +196,7 @@ function abstract_call_gf_by_type(interp::AbstractInterpreter, @nospecialize(f),
     elseif isa(matches, MethodMatches) ? (!matches.fullmatch || any_ambig(matches)) :
             (!_all(b->b, matches.fullmatches) || any_ambig(matches))
         # Account for the fact that we may encounter a MethodError with a non-covered or ambiguous signature.
-        tristate_merge!(sv, Effects(EFFECTS_TOTAL, nothrow=TRISTATE_UNKNOWN))
+        tristate_merge!(sv, Effects(EFFECTS_TOTAL, nothrow=TRISTATE_UNKNOWN, nothrow_if_inbounds=TRISTATE_UNKNOWN))
     end
 
     rettype = from_interprocedural!(rettype, sv, arginfo, conditionals)
@@ -1488,7 +1503,7 @@ function abstract_call_known(interp::AbstractInterpreter, @nospecialize(f),
             return abstract_modifyfield!(interp, argtypes, sv)
         end
         rt = abstract_call_builtin(interp, f, arginfo, sv, max_methods)
-        tristate_merge!(sv, builtin_effects(f, argtypes, rt))
+        tristate_merge!(sv, builtin_effects(f, arginfo, rt))
         return CallMeta(rt, false)
     elseif isa(f, Core.OpaqueClosure)
         # calling an OpaqueClosure about which we have no information returns no information
@@ -1809,7 +1824,8 @@ function abstract_eval_statement(interp::AbstractInterpreter, @nospecialize(e), 
         end
         tristate_merge!(sv, Effects(EFFECTS_TOTAL,
             consistent = !ismutabletype(t) ? ALWAYS_TRUE : ALWAYS_FALSE,
-            nothrow = is_nothrow ? ALWAYS_TRUE : ALWAYS_FALSE))
+            nothrow = is_nothrow ? ALWAYS_TRUE : ALWAYS_FALSE,
+            nothrow_if_inbounds = is_nothrow ? ALWAYS_TRUE : ALWAYS_FALSE))
     elseif ehead === :splatnew
         t, isexact = instanceof_tfunc(abstract_eval_value(interp, e.args[1], vtypes, sv))
         is_nothrow = false # TODO: More precision
@@ -1828,7 +1844,8 @@ function abstract_eval_statement(interp::AbstractInterpreter, @nospecialize(e), 
         end
         tristate_merge!(sv, Effects(EFFECTS_TOTAL,
             consistent = ismutabletype(t) ? ALWAYS_FALSE : ALWAYS_TRUE,
-            nothrow = is_nothrow ? ALWAYS_TRUE : ALWAYS_FALSE))
+            nothrow = is_nothrow ? ALWAYS_TRUE : ALWAYS_FALSE,
+            nothrow_if_inbounds = is_nothrow ? ALWAYS_TRUE : ALWAYS_FALSE))
     elseif ehead === :new_opaque_closure
         tristate_merge!(sv, Effects()) # TODO
         t = Union{}
@@ -1867,6 +1884,7 @@ function abstract_eval_statement(interp::AbstractInterpreter, @nospecialize(e), 
                 effects.consistent ? ALWAYS_TRUE : TRISTATE_UNKNOWN,
                 effects.effect_free ? ALWAYS_TRUE : TRISTATE_UNKNOWN,
                 effects.nothrow ? ALWAYS_TRUE : TRISTATE_UNKNOWN,
+                effects.nothrow_if_inbounds ? ALWAYS_TRUE : TRISTATE_UNKNOWN,
                 effects.terminates ? ALWAYS_TRUE : TRISTATE_UNKNOWN,
             ))
         else
@@ -1953,7 +1971,7 @@ function abstract_eval_global(M::Module, s::Symbol, frame::InferenceState)
     if isdefined(M,s)
         tristate_merge!(frame, Effects(EFFECTS_TOTAL, consistent=ALWAYS_FALSE))
     else
-        tristate_merge!(frame, Effects(EFFECTS_TOTAL, consistent=ALWAYS_FALSE, nothrow=ALWAYS_FALSE))
+        tristate_merge!(frame, Effects(EFFECTS_TOTAL, consistent=ALWAYS_FALSE, nothrow=ALWAYS_FALSE, nothrow_if_inbounds=false))
     end
     return ty
 end
@@ -2203,7 +2221,8 @@ function typeinf_local(interp::AbstractInterpreter, frame::InferenceState)
                     elseif isa(lhs, GlobalRef)
                         tristate_merge!(frame, Effects(EFFECTS_TOTAL,
                             effect_free=ALWAYS_FALSE,
-                            nothrow=TRISTATE_UNKNOWN))
+                            nothrow=TRISTATE_UNKNOWN,
+                            nothrow_if_inbounds=TRISTATE_UNKNOWN))
                     elseif !isa(lhs, SSAValue)
                         tristate_merge!(frame, Effects())
                     end
