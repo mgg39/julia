@@ -43,14 +43,14 @@ struct Effects
     # :consistent before caching. We may want to track it in the future.
     inbounds_taints_consistency::Bool
 end
-Effects(consistent::TriState, effect_free::TriState, nothrow::TriState nothrow_if_inbounds::TriState, terminates::TriState) =
+Effects(consistent::TriState, effect_free::TriState, nothrow::TriState, nothrow_if_inbounds::TriState, terminates::TriState) =
     Effects(consistent, effect_free, nothrow, nothrow_if_inbounds, terminates, false)
 Effects() = Effects(TRISTATE_UNKNOWN, TRISTATE_UNKNOWN, TRISTATE_UNKNOWN, TRISTATE_UNKNOWN, TRISTATE_UNKNOWN)
 
 Effects(e::Effects; consistent::TriState=e.consistent,
     effect_free::TriState = e.effect_free, nothrow::TriState=e.nothrow, nothrow_if_inbounds::TriState=e.nothrow_if_inbounds,
     terminates::TriState=e.terminates, inbounds_taints_consistency::Bool = e.inbounds_taints_consistency) =
-        Effects(consistent, effect_free, nothrow, terminates, inbounds_taints_consistency)
+        Effects(consistent, effect_free, nothrow, nothrow_if_inbounds, terminates, inbounds_taints_consistency)
 
 is_total_or_error(effects::Effects) =
     effects.consistent === ALWAYS_TRUE && effects.effect_free === ALWAYS_TRUE &&

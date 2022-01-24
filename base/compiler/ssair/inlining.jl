@@ -1318,6 +1318,24 @@ function handle_cases!(ir::IRCode, idx::Int, stmt::Expr, @nospecialize(atype),
     if fully_covered && length(cases) == 1
         handle_single_case!(ir, idx, stmt, cases[1].item, todo, params)
     elseif length(cases) > 0
+        all_removable = true
+        for case in cases
+            if isa(case, InvokeCase)
+                effects = case.effects
+            elseif isa(case, InliningTodo)
+                effects = case.spec.effects
+            else
+                continue
+            end
+            if !is_total(case.effects) &&
+               !(is_removable_if_unused(case.effects, ir[SSAValue(idx)][:flag] & IR_FLAG_INBOUNDS != 0))
+                all_removable = false
+                break
+            end
+        end
+        if all_removable
+            ir[SSAValue(idx)][:flag] |= IR_FLAG_EFFECT_FREE
+        end
         push!(todo, idx=>UnionSplit(fully_covered, atype, cases))
     end
     return nothing

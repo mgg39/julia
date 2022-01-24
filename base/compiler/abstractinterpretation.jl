@@ -1971,7 +1971,7 @@ function abstract_eval_global(M::Module, s::Symbol, frame::InferenceState)
     if isdefined(M,s)
         tristate_merge!(frame, Effects(EFFECTS_TOTAL, consistent=ALWAYS_FALSE))
     else
-        tristate_merge!(frame, Effects(EFFECTS_TOTAL, consistent=ALWAYS_FALSE, nothrow=ALWAYS_FALSE, nothrow_if_inbounds=false))
+        tristate_merge!(frame, Effects(EFFECTS_TOTAL, consistent=ALWAYS_FALSE, nothrow=ALWAYS_FALSE, nothrow_if_inbounds=ALWAYS_FALSE))
     end
     return ty
 end
