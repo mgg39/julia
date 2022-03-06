@@ -1258,7 +1258,7 @@ static void jl_collect_backedges( /* edges */ jl_array_t *s, /* ext_targets */ j
                         size_t max_valid = ~(size_t)0;
                         int ambig = 0;
                         jl_value_t *matches = jl_matching_methods((jl_tupletype_t*)sig, jl_nothing, -1, 0, jl_atomic_load_acquire(&jl_world_counter), &min_valid, &max_valid, &ambig);
-                        if (matches == jl_false) {
+                        if (matches == jl_nothing) {
                             valid = 0;
                             break;
                         }
@@ -2339,7 +2339,7 @@ static void jl_verify_edges(jl_array_t *targets, jl_array_t **pvalids)
         int ambig = 0;
         // TODO: possibly need to included ambiguities too (for the optimizer correctness)?
         jl_value_t *matches = jl_matching_methods((jl_tupletype_t*)sig, jl_nothing, -1, 0, jl_atomic_load_acquire(&jl_world_counter), &min_valid, &max_valid, &ambig);
-        if (matches == jl_false || jl_array_len(matches) != jl_array_len(expected)) {
+        if (matches == jl_nothing || jl_array_len(matches) != jl_array_len(expected)) {
             valid = 0;
         }
         else {
