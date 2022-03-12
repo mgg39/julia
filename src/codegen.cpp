@@ -6001,6 +6001,8 @@ static Function *gen_invoke_wrapper(jl_method_instance_t *lam, jl_value_t *jlret
     Function *w = Function::Create(JuliaType::get_jlfunc_ty(M->getContext()), GlobalVariable::ExternalLinkage, funcName, M);
     addRetAttr(w, Attribute::NonNull);
     w->addFnAttr(Attribute::get(M->getContext(), "thunk"));
+    w->addFnAttr(Attribute::OptimizeNone);
+    w->addFnAttr(Attribute::NoInline);
     jl_init_function(w);
     Function::arg_iterator AI = w->arg_begin();
     Value *funcArg = &*AI++;

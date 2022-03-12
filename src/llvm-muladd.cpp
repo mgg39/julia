@@ -55,6 +55,8 @@ static bool checkCombine(Module *m, Instruction *addOp, Value *maybeMul, Value *
 
 static bool combineMulAdd(Function &F)
 {
+    if (F.hasOptNone())
+        return false;
     Module *m = F.getParent();
     for (auto &BB: F) {
         for (auto it = BB.begin(); it != BB.end();) {
