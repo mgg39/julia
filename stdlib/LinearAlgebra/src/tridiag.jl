@@ -122,17 +122,23 @@ SymTridiagonal(S::SymTridiagonal) = S
 AbstractMatrix{T}(S::SymTridiagonal) where {T} =
     SymTridiagonal(convert(AbstractVector{T}, S.dv)::AbstractVector{T},
                    convert(AbstractVector{T}, S.ev)::AbstractVector{T})
-function Matrix{T}(M::SymTridiagonal) where T
+Matrix{T}(M::SymTridiagonal) where {T} = copyto!(Matrix{T}(undef, size(M)), M)
+function copyto!(A::AbstractMatrix{T}, M::SymTridiagonal) where {T}
+    require_one_based_indexing(A)
     n = size(M, 1)
-    Mf = zeros(T, n, n)
-    n == 0 && return Mf
-    @inbounds for i = 1:n-1
-        Mf[i,i] = symmetric(M.dv[i], :U)
-        Mf[i+1,i] = transpose(M.ev[i])
-        Mf[i,i+1] = M.ev[i]
+    n == 0 && return A
+    if size(A) == (n, n)
+        fill!(A, zero(T))
+        @inbounds for i in 1:n-1
+            A[i,i] = symmetric(M.dv[i], :U)
+            A[i+1,i] = transpose(M.ev[i])
+            A[i,i+1] = M.ev[i]
+        end
+        A[n,n] = symmetric(M.dv[n], :U)
+        return A
+    else
+        return @invoke copyto!(A::AbstractMatrix, M::AbstractMatrix)
     end
-    Mf[n,n] = symmetric(M.dv[n], :U)
-    return Mf
 end
 Matrix(M::SymTridiagonal{T}) where {T} = Matrix{T}(M)
 Array(M::SymTridiagonal) = Matrix(M)
@@ -571,16 +577,24 @@ function size(M::Tridiagonal, d::Integer)
     end
 end
 
-function Matrix{T}(M::Tridiagonal{T}) where T
-    A = zeros(T, size(M))
-    for i = 1:length(M.d)
-        A[i,i] = M.d[i]
+Matrix{T}(M::Tridiagonal) where {T} = copyto!(Matrix{T}(undef, size(M)), M)
+
+function copyto!(A::AbstractMatrix{T}, M::Tridiagonal) where {T}
+    require_one_based_indexing(A)
+    n = size(M, 1)
+    n == 0 && return A
+    if size(A) == (n, n)
+        fill!(A, zero(T))
+        @inbounds for i = 1:n-1
+            A[i,i] = M.d[i]
+            A[i+1,i] = M.dl[i]
+            A[i,i+1] = M.du[i]
+        end
+        A[n,n] = M.d[n]
+        return A
+    else
+        @invoke copyto!(A::AbstractMatrix, M::AbstractMatrix)
     end
-    for i = 1:length(M.d)-1
-        A[i+1,i] = M.dl[i]
-        A[i,i+1] = M.du[i]
-    end
-    A
 end
 Matrix(M::Tridiagonal{T}) where {T} = Matrix{T}(M)
 Array(M::Tridiagonal) = Matrix(M)

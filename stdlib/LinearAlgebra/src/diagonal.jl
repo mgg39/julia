@@ -91,6 +91,20 @@ similar(D::Diagonal, ::Type{T}) where {T} = Diagonal(similar(D.diag, T))
 similar(::Diagonal, ::Type{T}, dims::Union{Dims{1},Dims{2}}) where {T} = zeros(T, dims...)
 
 copyto!(D1::Diagonal, D2::Diagonal) = (copyto!(D1.diag, D2.diag); D1)
+function copyto!(A::AbstractMatrix{T}, D::Diagonal) where {T}
+    require_one_based_indexing(A)
+    n = length(D.diag)
+    n == 0 && return A
+    if size(A) == (n, n)
+        fill!(A, zero(T))
+        @inbounds for i in 1:n
+            A[i, i] = D.diag[i]
+        end
+        return A
+    else
+        return @invoke copyto!(A::AbstractMatrix, D::AbstractMatrix)
+    end
+end
 
 size(D::Diagonal) = (n = length(D.diag); (n,n))
 

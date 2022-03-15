@@ -429,12 +429,13 @@ end
     dl = [1, 1, 1]
     d = [1, 1, 1, 1]
     D = Diagonal(d)
-    Bi = Bidiagonal(d, dl, :L)
+    Bl = Bidiagonal(d, dl, :L)
+    Bu = Bidiagonal(d, dl, :U)
     Tri = Tridiagonal(dl, d, dl)
     Sym = SymTridiagonal(d, dl)
     F = qr(ones(4, 1))
     A = F.Q'
-    for A in (F.Q, F.Q'), B in (D, Bi, Tri, Sym)
+    for A in (F.Q, F.Q'), B in (D, Bl, Bu, Tri, Sym)
         @test B*A ≈ Matrix(B)*A
         @test A*B ≈ A*Matrix(B)
     end

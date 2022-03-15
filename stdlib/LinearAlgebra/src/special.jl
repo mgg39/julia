@@ -300,9 +300,9 @@ lmul!(Q::Adjoint{<:Any,<:QRPackedQ}, B::AbstractTriangular) = lmul!(Q, full!(B))
 function _qlmul(Q::AbstractQ, B)
     TQB = promote_type(eltype(Q), eltype(B))
     if size(Q.factors, 1) == size(B, 1)
-        Bnew = Matrix{TQB}(B)
+        Bnew = copy_similar(B, TQB)
     elseif size(Q.factors, 2) == size(B, 1)
-        Bnew = [Matrix{TQB}(B); zeros(TQB, size(Q.factors, 1) - size(B,1), size(B, 2))]
+        Bnew = [copy_similar(B, TQB); zeros(TQB, size(Q.factors, 1) - size(B,1), size(B, 2))]
     else
         throw(DimensionMismatch("first dimension of matrix must have size either $(size(Q.factors, 1)) or $(size(Q.factors, 2))"))
     end
@@ -331,9 +331,9 @@ function _qrmul(A, adjQ::Adjoint{<:Any,<:AbstractQ})
     Q = adjQ.parent
     TAQ = promote_type(eltype(A), eltype(Q))
     if size(A,2) == size(Q.factors, 1)
-        Anew = Matrix{TAQ}(A)
+        Anew = copy_similar(A, TAQ)
     elseif size(A,2) == size(Q.factors,2)
-        Anew = [Matrix{TAQ}(A) zeros(TAQ, size(A, 1), size(Q.factors, 1) - size(Q.factors, 2))]
+        Anew = [copy_similar(A, TAQ) zeros(TAQ, size(A, 1), size(Q.factors, 1) - size(Q.factors, 2))]
     else
         throw(DimensionMismatch("matrix A has dimensions $(size(A)) but matrix B has dimensions $(size(Q))"))
     end

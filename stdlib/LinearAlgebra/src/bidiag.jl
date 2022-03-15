@@ -165,28 +165,33 @@ function Base.replace_in_print_matrix(A::Bidiagonal,i::Integer,j::Integer,s::Abs
 end
 
 #Converting from Bidiagonal to dense Matrix
-function Matrix{T}(A::Bidiagonal) where T
-    n = size(A, 1)
-    B = zeros(T, n, n)
-    if n == 0
-        return B
-    end
-    for i = 1:n - 1
-        B[i,i] = A.dv[i]
-        if A.uplo == 'U'
-            B[i, i + 1] = A.ev[i]
-        else
-            B[i + 1, i] = A.ev[i]
-        end
-    end
-    B[n,n] = A.dv[n]
-    return B
-end
+Matrix{T}(A::Bidiagonal) where {T} = copyto!(Matrix{T}(undef, size(A)), A)
 Matrix(A::Bidiagonal{T}) where {T} = Matrix{T}(A)
 Array(A::Bidiagonal) = Matrix(A)
 promote_rule(::Type{Matrix{T}}, ::Type{<:Bidiagonal{S}}) where {T,S} =
     @isdefined(T) && @isdefined(S) ? Matrix{promote_type(T,S)} : Matrix
 promote_rule(::Type{Matrix}, ::Type{<:Bidiagonal}) = Matrix
+
+function copyto!(A::AbstractMatrix{T}, B::Bidiagonal) where {T}
+    require_one_based_indexing(A)
+    n = size(B, 1)
+    n == 0 && return A
+    if size(A) == (n, n)
+        fill!(A, zero(T))
+        @inbounds for i in 1:n - 1
+            A[i,i] = B.dv[i]
+            if B.uplo == 'U'
+                A[i, i + 1] = B.ev[i]
+            else
+                A[i + 1, i] = B.ev[i]
+            end
+        end
+        A[n,n] = B.dv[n]
+        return A
+    else
+        return @invoke copyto!(A::AbstractMatrix, B::AbstractMatrix)
+    end
+end
 
 #Converting from Bidiagonal to Tridiagonal
 function Tridiagonal{T}(A::Bidiagonal) where T
