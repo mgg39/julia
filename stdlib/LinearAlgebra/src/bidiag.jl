@@ -189,7 +189,7 @@ function copyto!(A::AbstractMatrix{T}, B::Bidiagonal) where {T}
         A[n,n] = B.dv[n]
         return A
     else
-        return @invoke copyto!(A::AbstractMatrix, B::AbstractMatrix)
+        return Base.@invoke copyto!(A::AbstractMatrix, B::AbstractMatrix)
     end
 end
 

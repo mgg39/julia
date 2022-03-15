@@ -102,7 +102,7 @@ function copyto!(A::AbstractMatrix{T}, D::Diagonal) where {T}
         end
         return A
     else
-        return @invoke copyto!(A::AbstractMatrix, D::AbstractMatrix)
+        return Base.@invoke copyto!(A::AbstractMatrix, D::AbstractMatrix)
     end
 end
 

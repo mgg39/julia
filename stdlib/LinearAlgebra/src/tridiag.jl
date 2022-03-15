@@ -137,7 +137,7 @@ function copyto!(A::AbstractMatrix{T}, M::SymTridiagonal) where {T}
         A[n,n] = symmetric(M.dv[n], :U)
         return A
     else
-        return @invoke copyto!(A::AbstractMatrix, M::AbstractMatrix)
+        return Base.@invoke copyto!(A::AbstractMatrix, M::AbstractMatrix)
     end
 end
 Matrix(M::SymTridiagonal{T}) where {T} = Matrix{T}(M)
@@ -593,7 +593,7 @@ function copyto!(A::AbstractMatrix{T}, M::Tridiagonal) where {T}
         A[n,n] = M.d[n]
         return A
     else
-        @invoke copyto!(A::AbstractMatrix, M::AbstractMatrix)
+        return Base.@invoke copyto!(A::AbstractMatrix, M::AbstractMatrix)
     end
 end
 Matrix(M::Tridiagonal{T}) where {T} = Matrix{T}(M)
